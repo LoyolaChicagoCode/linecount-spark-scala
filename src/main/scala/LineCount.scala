@@ -2,7 +2,7 @@
  * Distributed line count: Assumes a parallel/networked filesystem in this
  * version.
  */
- 
+
 package edu.luc.cs
 
 import java.io._
@@ -58,27 +58,28 @@ object LineCount {
     // This can be commented out if you don't want detailed performance
     // data per file (e.g. where it was computed, line count, delta time)
 
+ 
+    val (rddTime, rdd) = nanoTime {
+    	spark.parallelize(fileList, slices).map {
+          fileName => countLinesInFile(fileName)
+        }
+    }
+
     val (computeTimeDetails, text) = nanoTime {
-      spark.parallelize(fileList, slices).map {
-        fileName => countLinesInFile(fileName).toString + "\n"
-      }.reduce(_ + _)
+      rdd.map { fileInfo => fileInfo.toString } reduce(_ + _)
     }
 
     // Let's find out how long it takes (sequentially) to read all files
     // factoring out parallelism.
 
     val (computeIndividualTime, sumIndividualTime) = nanoTime {
-      spark.parallelize(fileList, slices).map {
-        fileName => countLinesInFile(fileName)._4
-      }.reduce(_ + _)
+      rdd map { _._4 } reduce(_ + _)
     }
 
     // This does the actual line count for all files in the fileset
 
     val (computeTime, count) = nanoTime {
-      spark.parallelize(fileList, slices).map {
-        fileName => countLinesInFile(fileName)._1
-      }.reduce(_ + _)
+      rdd map { _._1 } reduce(_ + _)
     }
 
     println("File Line Counts")
