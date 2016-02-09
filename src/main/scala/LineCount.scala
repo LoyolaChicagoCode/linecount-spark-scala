@@ -1,25 +1,12 @@
 /*
- * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with
- * this work for additional information regarding copyright ownership.
- * The ASF licenses this file to You under the Apache License, Version 2.0
- * (the "License"); you may not use this file except in compliance with
- * the License.  You may obtain a copy of the License at
- *
- *    http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * Distributed line count: Assumes a parallel/networked filesystem in this
+ * version.
  */
-
-// scalastyle:off println
-
+ 
 package edu.luc.cs
 
-import java.io.File
+import java.io._
+import java.net._
 import java.nio.file._
 import scala.math.random
 import scala.util.Try
@@ -28,41 +15,78 @@ import org.apache.spark._
 /** Computes an approximation to pi */
 object LineCount {
 
+  // time a block of Scala code - useful for timing everything!
+  def nanoTime[R](block: => R): (Double, R) = {
+    val t0 = System.nanoTime()
+    val result = block    // call-by-name
+    val t1 = System.nanoTime()
+    (t1 - t0, result)
+  }
+
   def recursiveListFiles(f: File): Array[File] = {
     val these = f.listFiles
     these ++ these.filter(_.isDirectory).flatMap(recursiveListFiles)
   }
 
-  // TODO: Eventually, convert to Java 7/8 directory stream
   def getFileList(path : String, ext : String) : Array[String] = {
     require { ext.startsWith(".") }
     val fullPath = new File(path).getAbsolutePath()
     recursiveListFiles( new File(fullPath) ).filter( f => f.getName().endsWith(ext)).map(_.getAbsolutePath())
   }
 
-  def countLinesInFile(fileName : String) : Int = {
+  def countLinesInFile(fileName : String) : (Int, String, String, Double) = {
     val path = Paths.get(fileName)
-    Try(Files.readAllLines(path).size()) getOrElse(0)
+    val hostname = InetAddress.getLocalHost.getHostName
+    val (fileTime, lineCount) = nanoTime {
+       Try(Files.readAllLines(path).size()) getOrElse(0)
+    }
+    (lineCount, hostname, fileName, fileTime)
   }
 
   def main(args: Array[String]) {
     val conf = new SparkConf().setAppName("LineCount File I/O")
     val spark = new SparkContext(conf)
-
-    // NOTE: This program only needs a directory of files to process recursively.
-    // TODO: Use Command-line parsing
-
     val path = if (args.length > 0) args(0) else "./data"
     val extension = if (args.length > 1) args(1) else ".txt"
 
     val slices = if (args.length > 2) args(2).toInt else 48
 
-    val count = spark.parallelize(getFileList(path, extension), slices).map {
-      fileName => countLinesInFile(fileName)
-    }.reduce(_ + _)
-    getFileList(path, ".txt") foreach println
-    println(s"Line count across all files $count")
+    val (lsTime, fileList) = nanoTime {
+      getFileList(path, extension)
+    }
+
+    // This can be commented out if you don't want detailed performance
+    // data per file (e.g. where it was computed, line count, delta time)
+
+    val (computeTimeDetails, text) = nanoTime {
+      spark.parallelize(fileList, slices).map {
+        fileName => countLinesInFile(fileName).toString + "\n"
+      }.reduce(_ + _)
+    }
+
+    // Let's find out how long it takes (sequentially) to read all files
+    // factoring out parallelism.
+
+    val (computeIndividualTime, sumIndividualTime) = nanoTime {
+      spark.parallelize(fileList, slices).map {
+        fileName => countLinesInFile(fileName)._4
+      }.reduce(_ + _)
+    }
+
+    // This does the actual line count for all files in the fileset
+
+    val (computeTime, count) = nanoTime {
+      spark.parallelize(fileList, slices).map {
+        fileName => countLinesInFile(fileName)._1
+      }.reduce(_ + _)
+    }
+
+    println("File Line Counts")
+    println(text)
+
+    println("Statistics")
+    println(s"#files=${fileList.length}, lsTime=$lsTime, computeTime=$computeTime, sumIndividualTime=$sumIndividualTime")
+    println(s"line count=$count")
     spark.stop()
   }
 }
-// scalastyle:on println
