@@ -15,12 +15,21 @@ import org.apache.spark._
 /** Computes an approximation to pi */
 object LineCount {
 
+  // case class is the Scala equivalent of a struct (but even more awesome)
+  case class Time(t : Double) {
+     val ns = t.toLong
+     val ms = (t * 1.0e6).toLong
+
+     def +(another : Time) : Time = Time(t + another.t)
+  }
+
   // time a block of Scala code - useful for timing everything!
-  def nanoTime[R](block: => R): (Double, R) = {
+  def nanoTime[R](block: => R): (Time, R) = {
     val t0 = System.nanoTime()
-    val result = block    // call-by-name
+    val result = block // block is eval'd call-by-name (Algol 68, anyone?)
     val t1 = System.nanoTime()
-    (t1 - t0, result)
+    val deltaT = t1 - t0
+    ( Time(deltaT), result)
   }
 
   def recursiveListFiles(f: File): Array[File] = {
@@ -34,13 +43,15 @@ object LineCount {
     recursiveListFiles( new File(fullPath) ).filter( f => f.getName().endsWith(ext)).map(_.getAbsolutePath())
   }
 
-  def countLinesInFile(fileName : String) : (Int, String, String, Double) = {
+  case class LineCountData(lineCount : Int, hostname : String, fileName : String, t : Time)
+
+  def countLinesInFile(fileName : String) : LineCountData = {
     val path = Paths.get(fileName)
     val hostname = InetAddress.getLocalHost.getHostName
     val (fileTime, lineCount) = nanoTime {
        Try(Files.readAllLines(path).size()) getOrElse(0)
     }
-    (lineCount, hostname, fileName, fileTime)
+    LineCountData(lineCount, hostname, fileName, fileTime)
   }
 
   def main(args: Array[String]) {
@@ -73,21 +84,21 @@ object LineCount {
     // factoring out parallelism.
 
     val (computeIndividualTime, sumIndividualTime) = nanoTime {
-      rdd map { _._4 } reduce(_ + _)
+      rdd map { _.t } reduce(_ + _)
     }
 
     // This does the actual line count for all files in the fileset
 
-    val (computeTime, count) = nanoTime {
-      rdd map { _._1 } reduce(_ + _)
+    val (computeTime, sumLineCount) = nanoTime {
+      rdd map { _.lineCount } reduce(_ + _)
     }
 
     println("File Line Counts")
     println(text)
 
     println("Statistics")
-    println(s"#files=${fileList.length}, lsTime=$lsTime, computeTime=$computeTime, sumIndividualTime=$sumIndividualTime")
-    println(s"line count=$count")
+    println(s"#files=${fileList.length}, rddTime=$rddTime.ms, lsTime=$lsTime.ms, computeTime=$computeTime.ms, sumIndividualTime=$sumIndividualTime.ms")
+    println(s"line count=$sumLineCount")
     spark.stop()
   }
 }
