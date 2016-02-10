@@ -22,7 +22,7 @@ object LineCount {
      val ns = t.toLong
 
      // milliseconds
-     val ms = (t * 1.0e6).toLong
+     val ms = (t / 1.0e6).toLong
 
      // allow for us to sum timing results
      def +(another : Time) : Time = Time(t + another.t)
@@ -84,7 +84,7 @@ object LineCount {
     }
 
     val (computeTimeDetails, text) = nanoTime {
-      rdd.map { fileInfo => fileInfo.toString } reduce(_ + _)
+      rdd.map { fileInfo => fileInfo.toString + "\n" } reduce(_ + _)
     }
 
     // Let's find out how long it takes (sequentially) to read all files
@@ -100,13 +100,20 @@ object LineCount {
       rdd map { _.lineCount } reduce(_ + _)
     }
 
+    // TODO: Get this into CSV form...
+
     println("File Line Counts")
     println(text)
 
-    println("Statistics")
+    println("Results")
     println(s"fileList.length=${fileList.length}")
-    println(s"rddTime=$rddTime.ms, lsTime=$lsTime.ms, computeTime=$computeTime.ms, sumIndividualTime=$sumIndividualTime.ms")
     println(s"sumLineCount=$sumLineCount")
+
+    println("Statistics")
+    println(s"rddTime=${rddTime.ms} ms")
+    println(s"lsTime=${lsTime.ms} ms")
+    println(s"computeTime=${computeTime.ms} ms")
+    println(s"sumIndividualTime=${sumIndividualTime.ms} ms")
     spark.stop()
   }
 }
