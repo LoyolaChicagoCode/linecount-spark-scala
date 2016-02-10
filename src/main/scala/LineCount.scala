@@ -26,6 +26,8 @@ object LineCount {
 
      // allow for us to sum timing results
      def +(another : Time) : Time = Time(t + another.t)
+
+     override def toString(): String = f"Time(t=$t%.2f, ns=$ns%d, ms=$ms%d)";
   }
 
   // time a block of Scala code - useful for timing everything!
