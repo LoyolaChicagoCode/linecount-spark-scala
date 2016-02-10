@@ -15,21 +15,30 @@ import org.apache.spark._
 /** Computes an approximation to pi */
 object LineCount {
 
-  // case class is the Scala equivalent of a struct (but even more awesome)
+  case class LineCountData(lineCount : Int, hostname : String, fileName : String, t : Time)
+
   case class Time(t : Double) {
+     // nanoseconds
      val ns = t.toLong
+
+     // milliseconds
      val ms = (t * 1.0e6).toLong
 
+     // allow for us to sum timing results
      def +(another : Time) : Time = Time(t + another.t)
   }
 
   // time a block of Scala code - useful for timing everything!
+  // return a Time object so we can obtain the time in desired units
+
   def nanoTime[R](block: => R): (Time, R) = {
     val t0 = System.nanoTime()
-    val result = block // block is eval'd call-by-name (Algol 68, anyone?)
+    // This executes the block and captures its result
+    // call-by-name (reminiscent of Algol 68)
+    val result = block
     val t1 = System.nanoTime()
     val deltaT = t1 - t0
-    ( Time(deltaT), result)
+    (Time(deltaT), result)
   }
 
   def recursiveListFiles(f: File): Array[File] = {
@@ -42,8 +51,6 @@ object LineCount {
     val fullPath = new File(path).getAbsolutePath()
     recursiveListFiles( new File(fullPath) ).filter( f => f.getName().endsWith(ext)).map(_.getAbsolutePath())
   }
-
-  case class LineCountData(lineCount : Int, hostname : String, fileName : String, t : Time)
 
   def countLinesInFile(fileName : String) : LineCountData = {
     val path = Paths.get(fileName)
@@ -97,8 +104,9 @@ object LineCount {
     println(text)
 
     println("Statistics")
-    println(s"#files=${fileList.length}, rddTime=$rddTime.ms, lsTime=$lsTime.ms, computeTime=$computeTime.ms, sumIndividualTime=$sumIndividualTime.ms")
-    println(s"line count=$sumLineCount")
+    println(s"fileList.length=${fileList.length}")
+    println(s"rddTime=$rddTime.ms, lsTime=$lsTime.ms, computeTime=$computeTime.ms, sumIndividualTime=$sumIndividualTime.ms")
+    println(s"sumLineCount=$sumLineCount")
     spark.stop()
   }
 }
