@@ -8,26 +8,21 @@ package edu.luc.cs
 import java.io._
 import java.net._
 import java.nio.file._
-import scala.math.random
 import scala.util.Try
 import org.apache.spark._
 
 /** Computes an approximation to pi */
 object LineCount {
 
-  case class LineCountData(lineCount : Int, hostname : String, fileName : String, t : Time)
+  case class LineCountData(lineCount : Int, hostname : String, fileName : String, time : Time)
 
   case class Time(t : Double) {
-     // nanoseconds
-     val ns = t.toLong
+     val nanoseconds = t.toLong
+     val milliseconds = (t / 1.0e6).toLong
 
-     // milliseconds
-     val ms = (t / 1.0e6).toLong
-
-     // allow for us to sum timing results
      def +(another : Time) : Time = Time(t + another.t)
 
-     override def toString(): String = f"Time(t=$t%.2f, ns=$ns%d, ms=$ms%d)";
+     override def toString(): String = f"Time(t=$t%.2f, ns=$nanoseconds%d, ms=$milliseconds%d)";
   }
 
   // time a block of Scala code - useful for timing everything!
@@ -75,34 +70,35 @@ object LineCount {
       getFileList(path, extension)
     }
 
-    // This can be commented out if you don't want detailed performance
-    // data per file (e.g. where it was computed, line count, delta time)
+    // create RDD from generated file listing
 
- 
     val (rddTime, rdd) = nanoTime {
     	spark.parallelize(fileList, slices).map {
           fileName => countLinesInFile(fileName)
         }
     }
 
+    // perform distributed line counting and print all information obtained
+    // this is mainly for diagnostic purposes
+
     val (computeTimeDetails, text) = nanoTime {
       rdd.map { fileInfo => fileInfo.toString + "\n" } reduce(_ + _)
     }
 
-    // Let's find out how long it takes (sequentially) to read all files
-    // factoring out parallelism.
+    // perform distributed line counting and sum up all individual times to get
+    // an idea of the actual workload of reading all files serially
 
     val (computeIndividualTime, sumIndividualTime) = nanoTime {
-      rdd map { _.t } reduce(_ + _)
+      rdd map { _.time } reduce(_ + _)
     }
 
-    // This does the actual line count for all files in the fileset
+    // perform distributed line counting but only project the total line count
 
     val (computeTime, sumLineCount) = nanoTime {
       rdd map { _.lineCount } reduce(_ + _)
     }
 
-    // TODO: Get this into CSV form...
+    // TODO: Get this into CSV form or something better for analysis
 
     println("File Line Counts")
     println(text)
@@ -112,10 +108,10 @@ object LineCount {
     println(s"sumLineCount=$sumLineCount")
 
     println("Statistics")
-    println(s"rddTime=${rddTime.ms} ms")
-    println(s"lsTime=${lsTime.ms} ms")
-    println(s"computeTime=${computeTime.ms} ms")
-    println(s"sumIndividualTime=${sumIndividualTime.ms} ms")
+    println(s"rddTime=${rddTime.milliseconds} ms")
+    println(s"lsTime=${lsTime.milliseconds} ms")
+    println(s"computeTime=${computeTime.milliseconds} ms")
+    println(s"sumIndividualTime=${sumIndividualTime.milliseconds} ms")
     spark.stop()
   }
 }
