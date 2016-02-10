@@ -13,6 +13,12 @@ project/boot/
 project/plugins/project/
 scala-2.10/
 scala-2.11/
+
 # Scala-IDE specific
 .scala_dependencies
 .worksheet
+
+# cluster files
+*.cobaltlog
+*.error
+*.output
