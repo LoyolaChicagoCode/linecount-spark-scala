@@ -10,43 +10,17 @@ import java.net._
 import java.nio.file._
 import scala.util.Try
 import org.apache.spark._
+import cs.luc.edu.timing._
+import cs.luc.edu.fileutils._
 
 object LineCount {
 
+  // This is the Scala way of doing a "struct". This allows us to change what is computed 
+  // without having to change anything but countLinesInFile()
+
   case class LineCountData(lineCount: Int, hostname: String, fileName: String, time: Time)
 
-  case class Time(t: Double) {
-    val nanoseconds = t.toLong
-    val milliseconds = (t / 1.0e6).toLong
-
-    def +(another: Time): Time = Time(t + another.t)
-
-    override def toString(): String = f"Time(t=$t%.2f, ns=$nanoseconds%d, ms=$milliseconds%d)";
-  }
-
-  // time a block of Scala code - useful for timing everything!
-  // return a Time object so we can obtain the time in desired units
-
-  def nanoTime[R](block: => R): (Time, R) = {
-    val t0 = System.nanoTime()
-    // This executes the block and captures its result
-    // call-by-name (reminiscent of Algol 68)
-    val result = block
-    val t1 = System.nanoTime()
-    val deltaT = t1 - t0
-    (Time(deltaT), result)
-  }
-
-  def recursiveListFiles(f: File): Array[File] = {
-    val these = f.listFiles
-    these ++ these.filter(_.isDirectory).flatMap(recursiveListFiles)
-  }
-
-  def getFileList(path: String, ext: String): Array[String] = {
-    require { ext.startsWith(".") }
-    val fullPath = new File(path).getAbsolutePath()
-    recursiveListFiles(new File(fullPath)).filter(f => f.getName().endsWith(ext)).map(_.getAbsolutePath())
-  }
+  // This function is evaluated in parallel via the RDD
 
   def countLinesInFile(fileName: String): LineCountData = {
     val path = Paths.get(fileName)
