@@ -11,18 +11,17 @@ import java.nio.file._
 import scala.util.Try
 import org.apache.spark._
 
-/** Computes an approximation to pi */
 object LineCount {
 
-  case class LineCountData(lineCount : Int, hostname : String, fileName : String, time : Time)
+  case class LineCountData(lineCount: Int, hostname: String, fileName: String, time: Time)
 
-  case class Time(t : Double) {
-     val nanoseconds = t.toLong
-     val milliseconds = (t / 1.0e6).toLong
+  case class Time(t: Double) {
+    val nanoseconds = t.toLong
+    val milliseconds = (t / 1.0e6).toLong
 
-     def +(another : Time) : Time = Time(t + another.t)
+    def +(another: Time): Time = Time(t + another.t)
 
-     override def toString(): String = f"Time(t=$t%.2f, ns=$nanoseconds%d, ms=$milliseconds%d)";
+    override def toString(): String = f"Time(t=$t%.2f, ns=$nanoseconds%d, ms=$milliseconds%d)";
   }
 
   // time a block of Scala code - useful for timing everything!
@@ -43,17 +42,17 @@ object LineCount {
     these ++ these.filter(_.isDirectory).flatMap(recursiveListFiles)
   }
 
-  def getFileList(path : String, ext : String) : Array[String] = {
+  def getFileList(path: String, ext: String): Array[String] = {
     require { ext.startsWith(".") }
     val fullPath = new File(path).getAbsolutePath()
-    recursiveListFiles( new File(fullPath) ).filter( f => f.getName().endsWith(ext)).map(_.getAbsolutePath())
+    recursiveListFiles(new File(fullPath)).filter(f => f.getName().endsWith(ext)).map(_.getAbsolutePath())
   }
 
-  def countLinesInFile(fileName : String) : LineCountData = {
+  def countLinesInFile(fileName: String): LineCountData = {
     val path = Paths.get(fileName)
     val hostname = InetAddress.getLocalHost.getHostName
     val (fileTime, lineCount) = nanoTime {
-       Try(Files.readAllLines(path).size()) getOrElse(0)
+      Try(Files.readAllLines(path).size()) getOrElse (0)
     }
     LineCountData(lineCount, hostname, fileName, fileTime)
   }
@@ -73,29 +72,29 @@ object LineCount {
     // create RDD from generated file listing
 
     val (rddTime, rdd) = nanoTime {
-    	spark.parallelize(fileList, slices).map {
-          fileName => countLinesInFile(fileName)
-        }
+      spark.parallelize(fileList, slices).map {
+        fileName => countLinesInFile(fileName)
+      }
     }
 
     // perform distributed line counting and print all information obtained
     // this is mainly for diagnostic purposes
 
     val (computeTimeDetails, text) = nanoTime {
-      rdd.map { fileInfo => fileInfo.toString + "\n" } reduce(_ + _)
+      rdd.map { fileInfo => fileInfo.toString + "\n" } reduce (_ + _)
     }
 
     // perform distributed line counting and sum up all individual times to get
     // an idea of the actual workload of reading all files serially
 
     val (computeIndividualTime, sumIndividualTime) = nanoTime {
-      rdd map { _.time } reduce(_ + _)
+      rdd map { _.time } reduce (_ + _)
     }
 
     // perform distributed line counting but only project the total line count
 
     val (computeTime, sumLineCount) = nanoTime {
-      rdd map { _.lineCount } reduce(_ + _)
+      rdd map { _.lineCount } reduce (_ + _)
     }
 
     // TODO: Get this into CSV form or something better for analysis
