@@ -20,6 +20,9 @@ object LineCount {
 
   case class LineCountData(lineCount: Int, hostname: String, fileName: String, time: Time)
 
+  case class Config(dir: Option[String] = None, ext: Option[String] = None,
+    slices: Int = 48)
+
   // This function is evaluated in parallel via the RDD
 
   def countLinesInFile(fileName: String): LineCountData = {
@@ -31,13 +34,32 @@ object LineCount {
     LineCountData(lineCount, hostname, fileName, fileTime)
   }
 
+  def parseCommandLine(args: Array[String]): Option[Config] = {
+    val parser = new scopt.OptionParser[Config]("scopt") {
+      head("LineCount", "1.0")
+      opt[String]('d', "dir") action { (x, c) =>
+        c.copy(dir = Some(x))
+      } text ("dir is a String property")
+      opt[String]('e', "extension") action { (x, c) =>
+        c.copy(ext = Some(x))
+      } text ("ext is a String property")
+      opt[Int]('s', "slices") action { (x, c) =>
+        c.copy(slices = x)
+      } text ("slices is an Int property")
+      help("help") text ("prints this usage text")
+
+    }
+    // parser.parse returns Option[C]
+    parser.parse(args, Config())
+  }
+
   def main(args: Array[String]) {
     val conf = new SparkConf().setAppName("LineCount File I/O")
     val spark = new SparkContext(conf)
-    val path = if (args.length > 0) args(0) else "./data"
-    val extension = if (args.length > 1) args(1) else ".txt"
-
-    val slices = if (args.length > 2) args(2).toInt else 48
+    val appConfig = parseCommandLine(args).getOrElse(Config())
+    val path = appConfig.dir.getOrElse("./data")
+    val extension = appConfig.ext.getOrElse(".txt")
+    val slices = appConfig.slices
 
     val (lsTime, fileList) = nanoTime {
       getFileList(path, extension)
