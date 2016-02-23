@@ -87,6 +87,12 @@ object LineCount {
       rdd map { _.time } reduce (_ + _)
     }
 
+    // This shows how to count the number of unique hosts involved
+    // in the computation.
+
+    val pairs = rdd.map(lc => (lc.hostname, 1))
+    val counts = pairs.reduceByKey((a, b) => a + b)
+
     // perform distributed line counting but only project the total line count
 
     val (computeTime, sumLineCount) = nanoTime {
@@ -94,6 +100,10 @@ object LineCount {
     }
 
     // TODO: Get this into CSV form or something better for analysis
+
+    println("Nodes Used")
+    println(counts.count())
+    counts.collect() foreach println
 
     println("File Line Counts")
     println(text)
