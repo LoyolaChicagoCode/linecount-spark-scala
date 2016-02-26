@@ -10,7 +10,7 @@ import java.net._
 import java.nio.file._
 import scala.util.Try
 import org.apache.spark._
-import cs.luc.edu.timing._
+import cs.luc.edu.performance._
 import cs.luc.edu.fileutils._
 
 object LineCount {
@@ -18,20 +18,19 @@ object LineCount {
   // This is the Scala way of doing a "struct". This allows us to change what is computed 
   // without having to change anything but countLinesInFile()
 
-  case class LineCountData(lineCount: Int, hostname: String, fileName: String, time: Time)
+  case class LineCountData(lineCount: Int, hostname: String, fileName: String, time: Time, space: Space)
 
-  case class Config(dir: Option[String] = None, ext: Option[String] = None,
-    slices: Int = 48)
+  case class Config(dir: Option[String] = None, ext: Option[String] = None, slices: Int = 48)
 
   // This function is evaluated in parallel via the RDD
 
   def countLinesInFile(fileName: String): LineCountData = {
     val path = Paths.get(fileName)
     val hostname = InetAddress.getLocalHost.getHostName
-    val (fileTime, lineCount) = nanoTime {
+    val (fileTime, fileSpace, lineCount) = performance {
       Try(Files.readAllLines(path).size()) getOrElse (0)
     }
-    LineCountData(lineCount, hostname, fileName, fileTime)
+    LineCountData(lineCount, hostname, fileName, fileTime, fileSpace)
   }
 
   def parseCommandLine(args: Array[String]): Option[Config] = {
@@ -61,13 +60,13 @@ object LineCount {
     val extension = appConfig.ext.getOrElse(".txt")
     val slices = appConfig.slices
 
-    val (lsTime, fileList) = nanoTime {
+    val (lsTime, lsSpace, fileList) = performance {
       getFileList(path, extension)
     }
 
     // create RDD from generated file listing
 
-    val (rddTime, rdd) = nanoTime {
+    val (rddTime, rddSpace, rdd) = performance {
       spark.parallelize(fileList, slices).map {
         fileName => countLinesInFile(fileName)
       }
@@ -76,14 +75,14 @@ object LineCount {
     // perform distributed line counting and print all information obtained
     // this is mainly for diagnostic purposes
 
-    val (computeTimeDetails, text) = nanoTime {
+    val (computeTimeDetails, computeSpaceDetails, text) = performance {
       rdd.map { fileInfo => fileInfo.toString + "\n" } reduce (_ + _)
     }
 
     // perform distributed line counting and sum up all individual times to get
     // an idea of the actual workload of reading all files serially
 
-    val (computeIndividualTime, sumIndividualTime) = nanoTime {
+    val (computeIndividualTime, computeIndividualSpace, sumIndividualTime) = performance {
       rdd map { _.time } reduce (_ + _)
     }
 
@@ -95,7 +94,7 @@ object LineCount {
 
     // perform distributed line counting but only project the total line count
 
-    val (computeTime, sumLineCount) = nanoTime {
+    val (computeTime, computeSpace, sumLineCount) = performance {
       rdd map { _.lineCount } reduce (_ + _)
     }
 
@@ -117,6 +116,9 @@ object LineCount {
     println(s"lsTime=${lsTime.milliseconds} ms")
     println(s"computeTime=${computeTime.milliseconds} ms")
     println(s"sumIndividualTime=${sumIndividualTime.milliseconds} ms")
+
+    println("Quick look at memory on each Spark node")
+    println(rddSpace)
     spark.stop()
   }
 }
