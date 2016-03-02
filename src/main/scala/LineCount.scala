@@ -10,7 +10,7 @@ import java.net._
 import java.nio.file._
 import scala.util.Try
 import org.apache.spark._
-import cs.luc.edu.performance._
+import blockperf._
 import cs.luc.edu.fileutils._
 
 object LineCount {
