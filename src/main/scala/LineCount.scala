@@ -12,13 +12,15 @@ import scala.util.Try
 import org.apache.spark._
 import blockperf._
 import cs.luc.edu.fileutils._
+import squants.time._
+import squants.storage._
 
 object LineCount {
 
   // This is the Scala way of doing a "struct". This allows us to change what is computed 
   // without having to change anything but countLinesInFile()
 
-  case class LineCountData(lineCount: Int, hostname: String, fileName: String, time: Time, space: Space)
+  case class LineCountData(lineCount: Int, hostname: String, fileName: String, time: blockperf.Time, space: blockperf.Space)
 
   case class Config(dir: Option[String] = None, ext: Option[String] = None, slices: Int = 48)
 
@@ -112,13 +114,13 @@ object LineCount {
     println(s"sumLineCount=$sumLineCount")
 
     println("Statistics")
-    println(s"rddTime=${rddTime.milliseconds} ms")
-    println(s"lsTime=${lsTime.milliseconds} ms")
-    println(s"computeTime=${computeTime.milliseconds} ms")
-    println(s"sumIndividualTime=${sumIndividualTime.milliseconds} ms")
+    println(s"rddTime=${rddTime.time in Milliseconds}")
+    println(s"lsTime=${lsTime.time in Milliseconds}")
+    println(s"computeTime=${computeTime.time in Milliseconds}")
+    println(s"sumIndividualTime=${sumIndividualTime.time in Milliseconds}")
 
     println("Quick look at memory on each Spark node")
-    println(rddSpace)
+    println(rddSpace.free)
     spark.stop()
   }
 }

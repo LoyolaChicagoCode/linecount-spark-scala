@@ -8,10 +8,13 @@ scalacOptions ++= Seq("-deprecation", "-feature", "-unchecked")
 
 mainClass in assembly := Some("edu.luc.cs.LineCount")
 
-resolvers += "gkthiruvathukal@bintray" at "http://dl.bintray.com/gkthiruvathukal/maven"
+resolvers ++= Seq(
+  "gkthiruvathukal@bintray" at "http://dl.bintray.com/gkthiruvathukal/maven",
+  "Sonatype OSS Snapshots" at "https://oss.sonatype.org/content/repositories/snapshots"
+)
 
 libraryDependencies ++= Seq(
-  "edu.luc.cs" %% "blockperf" % "0.2.3",
+  "edu.luc.cs" %% "blockperf" % "0.4.2",
   "com.novocode" % "junit-interface" % "latest.release" % "test",
   "org.apache.spark" %% "spark-core" % "1.4.1" % "provided",
   "com.github.scopt" %% "scopt" % "3.3.0",
