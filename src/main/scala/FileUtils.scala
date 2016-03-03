@@ -2,7 +2,6 @@
 package cs.luc.edu
 
 import java.io._
-import java.nio.file._
 
 package object fileutils {
 

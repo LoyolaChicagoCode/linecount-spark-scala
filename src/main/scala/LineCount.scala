@@ -5,22 +5,22 @@
 
 package edu.luc.cs
 
-import java.io._
 import java.net._
 import java.nio.file._
-import scala.util.Try
-import org.apache.spark._
+
 import blockperf._
 import cs.luc.edu.fileutils._
+import org.apache.spark._
 import squants.time._
-import squants.storage._
+
+import scala.util.Try
 
 object LineCount {
 
-  // This is the Scala way of doing a "struct". This allows us to change what is computed 
+  // This is the Scala way of doing a "struct". This allows us to change what is computed
   // without having to change anything but countLinesInFile()
 
-  case class LineCountData(lineCount: Int, hostname: String, fileName: String, time: blockperf.Time, space: blockperf.Space)
+  case class LineCountData(lineCount: Int, hostname: String, fileName: String, time: ElapsedTime, space: MemoryUsage)
 
   case class Config(dir: Option[String] = None, ext: Option[String] = None, slices: Int = 48)
 
